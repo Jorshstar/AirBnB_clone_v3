@@ -1,57 +1,58 @@
 #!/usr/bin/python3
-'''Module for User RestAPI'''
-from flask import jsonify, abort, request
-from models.user import User
-from models import storage
+"""
+    states.py file in v1/views
+"""
+from flask import abort, Flask, jsonify, request
 from api.v1.views import app_views
+from models import storage
+from models.user import User
 
 
-@app_views.route('/users', strict_slashes=False, methods=['GET', 'POST'])
-def user_list():
-    '''Interested in list of all users'''
+@app_views.route("/users", methods=["GET", "POST"], strict_slashes=False)
+def handle_users():
+    """
+        Method to return a JSON representation of all states
+    """
     if request.method == 'GET':
-        user_list = storage.all('User')
-        list_dict = [user.to_dict() for user in user_list.values()]
-        return jsonify(list_dict)
-    if request.method == 'POST':
-        try:
-            json_body = request.get_json()
-            if not json_body:
-                abort(400, 'Not a JSON')
-            if json_body['email'] is None:
-                abort(400, 'Missing email')
-            if json_body['password'] is None:
-                abort(400, 'Missing password')
-            user = User(**json_body)
-            new_inst = storage.new(user)
-            storage.save()
-            return jsonify(user.to_dict()), 201
-        except Exception as err:
-            abort(404)
+        users = storage.all(User)
+        all_users = []
+        for user in users.values():
+            all_users.append(user.to_dict())
+        return jsonify(all_users)
+    elif request.method == 'POST':
+        post = request.get_json()
+        if post is None or type(post) != dict:
+            return jsonify({'error': 'Not a JSON'}), 400
+        elif post.get('email') is None:
+            return jsonify({'error': 'Missing email'}), 400
+        elif post.get('password') is None:
+            return jsonify({'error': 'Missing password'}), 400
+        new_user = User(**post)
+        new_user.save()
+        return jsonify(new_user.to_dict()), 201
 
 
-@app_views.route('/users/<user_id>',
-                 strict_slashes=False, methods=['GET', 'DELETE', 'PUT'])
-def user_detail(user_id):
-    '''Interested in details of a specific user'''
-    user = storage.get(User, user_id)
-    if user is None:
+@app_views.route("/users/<user_id>", methods=["GET", "PUT", "DELETE"],
+                 strict_slashes=False)
+def handle_user_by_id(user_id):
+    """
+        Method to return a JSON representation of a state
+    """
+    user_by_id = storage.get(User, user_id)
+    if user_by_id is None:
         abort(404)
-    if request.method == 'GET':
-        return jsonify(user.to_dict())
-    if request.method == 'DELETE':
-        storage.delete(user)
+    elif request.method == 'GET':
+        return jsonify(user_by_id.to_dict())
+    elif request.method == 'DELETE':
+        storage.delete(user_by_id)
         storage.save()
-        return jsonify({})
-    else:
-        try:
-            json_body = request.get_json()
-            if not json_body:
-                abort(400, 'Not a JSON')
-            for k, v in json_body.items():
-                if k not in ['id', 'created_at', 'updated_at']:
-                    setattr(user, k, v)
-            storage.save()
-            return jsonify(user.to_dict())
-        except Exception as err:
-            abort(404)
+        return jsonify({}), 200
+    elif request.method == 'PUT':
+        put = request.get_json()
+        if put is None or type(put) != dict:
+            return jsonify({'message': 'Not a JSON'}), 400
+        for key, value in put.items():
+            if key not in ['id', 'created_at', 'updated_at']:
+                setattr(user_by_id, key, value)
+        storage.save()
+        return jsonify(user_by_id.to_dict()), 200

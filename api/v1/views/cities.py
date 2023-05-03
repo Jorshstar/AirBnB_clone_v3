@@ -1,60 +1,66 @@
 #!/usr/bin/python3
-'''Module for City Rest API'''
-from flask import jsonify, abort, request
-from models.state import State
-from models.city import City
-from models import storage
+"""
+    cities.py file in v1/views
+"""
+from flask import abort, Flask, jsonify, request
 from api.v1.views import app_views
+from models import storage
+from models.city import City
+from models.state import State
 
 
-@app_views.route('/states/<state_id>/cities',
-                 strict_slashes=False, methods=['GET', 'POST'])
-def city_list(state_id):
-    '''Interested in list of cities of particular states'''
-    state = storage.get(State, state_id)
-    if state is None:
-        abort(404)
+@app_views.route("/states/<state_id>/cities", methods=["GET", "POST"], strict_slashes=False)
+def handle_cities(state_id):
+    """
+        Method to return a JSON representation of cities by state
+    """
+    state_by_id = storage.get(State, state_id)
+    if state_by_id is None:
+        abort(404, 'Not found')
+
     if request.method == 'GET':
-        list_city = [city.to_dict() for city in state.cities]
-        return jsonify(list_city)
-    if request.method == 'POST':
-        try:
-            json_body = request.get_json()
-            if not json_body:
-                abort(400, 'Not a JSON')
-            if json_body['name'] is None:
-                abort(400, 'Missing name')
-            city = City(**json_body)
-            city.state_id = state_id
-            new_inst = storage.new(city)
-            storage.save()
-            return jsonify(city.to_dict()), 201
-        except Exception as err:
+        city_list = []
+        for city in state_by_id.cities:
+            city_list.append(city.to_dict())
+        return jsonify(city_list)
+
+    elif request.method == 'POST':
+        post = request.get_json()
+        if post is None or type(post) != dict:
+            return jsonify({'error': 'Not a JSON'}), 400
+        elif post.get('name') is None:
+            return jsonify({'error': 'Missing name'}), 400
+
+        state_by_id = storage.get(State, state_id)
+        if not state_by_id:
             abort(404)
 
+        new_state = City(**post)
+        new_state.save()
+        return jsonify(new_state.to_dict()), 201
 
-@app_views.route('/cities/<city_id>',
-                 strict_slashes=False, methods=['GET', 'DELETE', 'PUT'])
-def city_detail(city_id):
-    '''Interested in details of a specific state'''
-    city = storage.get(City, city_id)
-    if city is None:
+
+@app_views.route("/cities/<city_id>", methods=["GET", "PUT", "DELETE"],
+                 strict_slashes=False)
+def handle_cities_by_id(city_id):
+    """
+        Method to return a JSON representation of a city
+    """
+    city_by_id = storage.get(City, city_id)
+    if city_by_id is None:
         abort(404)
-    if request.method == 'GET':
-        return jsonify(city.to_dict())
-    if request.method == 'DELETE':
-        storage.delete(city)
+    elif request.method == 'GET':
+        return jsonify(city_by_id.to_dict())
+    elif request.method == 'DELETE':
+        storage.delete(city_by_id)
         storage.save()
-        return jsonify({})
-    else:
-        try:
-            json_body = request.get_json()
-            if not json_body:
-                abort(400, 'Not a JSON')
-            for k, v in json_body.items():
-                if k not in ['id', 'state_id', 'created_at', 'updated_at']:
-                    setattr(city, k, v)
-            storage.save()
-            return jsonify(city.to_dict())
-        except Exception as err:
-            abort(404)
+        return jsonify({}), 200
+    elif request.method == 'PUT':
+        put = request.get_json()
+        if put is None or type(put) != dict:
+            return jsonify({'message': 'Not a JSON'}), 400
+        for key, value in put.items():
+            if key not in ['id', 'created_at', 'updated_at']:
+                setattr(city_by_id, key, value)
+        storage.save()
+        return jsonify(city_by_id.to_dict()), 200
