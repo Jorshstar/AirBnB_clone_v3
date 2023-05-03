@@ -1,58 +1,80 @@
 #!/usr/bin/python3
-"""
-    states.py file in v1/views
-"""
-from flask import abort, Flask, jsonify, request
+'''
+    RESTful API for class User
+'''
+from flask import Flask, jsonify, abort, request
 from api.v1.views import app_views
 from models import storage
 from models.user import User
 
 
-@app_views.route("/users", methods=["GET", "POST"], strict_slashes=False)
-def handle_users():
-    """
-        Method to return a JSON representation of all states
-    """
-    if request.method == 'GET':
-        users = storage.all(User)
-        all_users = []
-        for user in users.values():
-            all_users.append(user.to_dict())
-        return jsonify(all_users)
-    elif request.method == 'POST':
-        post = request.get_json()
-        if post is None or type(post) != dict:
-            return jsonify({'error': 'Not a JSON'}), 400
-        elif post.get('email') is None:
-            return jsonify({'error': 'Missing email'}), 400
-        elif post.get('password') is None:
-            return jsonify({'error': 'Missing password'}), 400
-        new_user = User(**post)
-        new_user.save()
-        return jsonify(new_user.to_dict()), 201
+@app_views.route('/users', methods=['GET'], strict_slashes=False)
+def get_users():
+    '''
+        return all user objects in json form
+    '''
+    user_list = [u.to_dict() for u in storage.all('User').values()]
+    return jsonify(user_list)
 
 
-@app_views.route("/users/<user_id>", methods=["GET", "PUT", "DELETE"],
-                 strict_slashes=False)
-def handle_user_by_id(user_id):
-    """
-        Method to return a JSON representation of a state
-    """
-    user_by_id = storage.get(User, user_id)
-    if user_by_id is None:
+@app_views.route('/users/<user_id>', methods=['GET'], strict_slashes=False)
+def get_user_id(user_id):
+    '''
+        return user with given id using http verb GET
+    '''
+    user = storage.get("User", user_id)
+    if user is None:
         abort(404)
-    elif request.method == 'GET':
-        return jsonify(user_by_id.to_dict())
-    elif request.method == 'DELETE':
-        storage.delete(user_by_id)
-        storage.save()
-        return jsonify({}), 200
-    elif request.method == 'PUT':
-        put = request.get_json()
-        if put is None or type(put) != dict:
-            return jsonify({'message': 'Not a JSON'}), 400
-        for key, value in put.items():
-            if key not in ['id', 'created_at', 'updated_at']:
-                setattr(user_by_id, key, value)
-        storage.save()
-        return jsonify(user_by_id.to_dict()), 200
+    return jsonify(user.to_dict())
+
+
+@app_views.route('/users/<user_id>', methods=['DELETE'], strict_slashes=False)
+def delete_user(user_id):
+    '''
+        delete user obj given user_id
+    '''
+    user = storage.get("User", user_id)
+    if user is None:
+        abort(404)
+    user.delete()
+    storage.save()
+    return jsonify({}), 200
+
+
+@app_views.route('/users', methods=['POST'], strict_slashes=False)
+def create_user():
+    '''
+        create new user obj
+    '''
+    if not request.get_json():
+        return jsonify({"error": "Not a JSON"}), 400
+    elif "email" not in request.get_json():
+        return jsonify({"error": "Missing email"}), 400
+    elif "password" not in request.get_json():
+        return jsonify({"error": "Missing password"}), 400
+    else:
+        obj_data = request.get_json()
+        obj = User(**obj_data)
+        obj.save()
+        return jsonify(obj.to_dict()), 201
+
+
+@app_views.route('/users/<user_id>', methods=['PUT'], strict_slashes=False)
+def update_user(user_id):
+    '''
+        update existing user object
+    '''
+    if not request.get_json():
+        return jsonify({"error": "Not a JSON"}), 400
+    obj = storage.get("User", user_id)
+    if obj is None:
+        abort(404)
+    obj_data = request.get_json()
+    ignore = ("id", "email", "created_at", "updated_at")
+    for k in obj_data.keys():
+        if k in ignore:
+            pass
+        else:
+            setattr(obj, k, obj_data[k])
+    obj.save()
+    return jsonify(obj.to_dict()), 200
