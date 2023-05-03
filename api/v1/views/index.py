@@ -1,21 +1,37 @@
 #!/usr/bin/python3
-"""Contains the index view for the API."""
-from api.v1.views import app_views
+"""
+    index.py file in v1/views
+"""
+
 from flask import jsonify
 from models import storage
-@app_views.route('/status')
-def status():
-    """Returns a json object describing status"""
-    return jsonify({'status': 'OK'})
-@app_views.route('/stats')
-def stats():
-    """Gets the number of each objects by type"""
-    from models.amenity import Amenity
-    from models.city import City
-    from models.place import Place
-    from models.review import Review
-    from models.state import State
-    from models.user import User
-    classes = {'amenities': Amenity, 'cities': City, 'places': Place,
-               'reviews': Review, 'states': State, 'users': User}
-    return jsonify({x: storage.count(classes[x]) for x in classes.keys()})
+from api.v1.views import app_views
+from models.amenity import Amenity
+from models.city import City
+from models.place import Place
+from models.review import Review
+from models.state import State
+from models.user import User
+
+
+@app_views.route("/status")
+def status_message():
+    """
+        method to return an OK status
+    """
+    return jsonify({"status": "OK"})
+
+
+@app_views.route("/stats")
+def get_stats():
+    """
+        get the number of each objects
+    """
+    return jsonify({
+        "amenities": storage.count(Amenity),
+        "cities": storage.count(City),
+        "places": storage.count(Place),
+        "reviews": storage.count(Review),
+        "states": storage.count(State),
+        "users": storage.count(User),
+    })
